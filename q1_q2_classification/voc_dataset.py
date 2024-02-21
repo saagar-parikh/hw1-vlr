@@ -122,7 +122,9 @@ class VOCDataset(Dataset):
             lst = [transforms.CenterCrop(size=(self.size, self.size))]
         else:
             lst =  [
+                transforms.ColorJitter(brightness=0.5, hue=0.3),
                 transforms.RandomResizedCrop(size=(self.size, self.size), antialias=True),
+                transforms.RandomRotation((0,180)),
                 transforms.RandomHorizontalFlip(p=0.5),
             ]
         
