@@ -5,6 +5,10 @@ from simple_cnn import SimpleCNN
 from voc_dataset import VOCDataset
 import numpy as np
 import random
+import warnings
+
+warnings.filterwarnings("ignore")
+
 
 if __name__ == "__main__":
     np.random.seed(0)
@@ -18,21 +22,23 @@ if __name__ == "__main__":
     # You should experiment and choose the correct hyperparameters
     # You should get a map of around 22 in 5 epochs
     ##################################################################
-    # args = ARGS(
-    #     epochs=10,
-    #     inp_size=64,
-    #     use_cuda=True,
-    #     val_every=70
-    #     lr=# TODO,
-    #     batch_size=#TODO,
-    #     step_size=#TODO,
-    #     gamma=#TODO
-    # )
+    args = ARGS(
+        epochs=10,
+        inp_size=64,
+        use_cuda=True,
+        val_every=70,
+        lr= 0.001,             #TODO
+        batch_size=64,         #TODO
+        step_size=30,          #TODO
+        gamma=0.1,             #TODO
+        save_at_end=True,
+    )
     ##################################################################
     #                          END OF YOUR CODE                      #
     ##################################################################
 
     print(args)
+    # print(args.lr)
 
     # initializes the model
     model = SimpleCNN(num_classes=len(VOCDataset.CLASS_NAMES), inp_size=64, c_dim=3)
