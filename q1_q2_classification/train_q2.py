@@ -52,10 +52,10 @@ if __name__ == "__main__":
         inp_size=64,
         use_cuda=True,
         val_every=70,
-        lr=0.003,        # TODO,
-        batch_size=32,   # TODO,
-        step_size=10,    # TODO,
-        gamma=0.1,       # TODO
+        lr=0.0001,        # TODO,
+        batch_size=64,   # TODO,
+        step_size=8,    # TODO,
+        gamma=0.6,       # TODO
     )
     ##################################################################
     #                          END OF YOUR CODE                      #
