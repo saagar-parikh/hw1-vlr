@@ -77,7 +77,43 @@ class DetectorBackboneWithFPN(nn.Module):
         # This behaves like a Python dict, but makes PyTorch understand that
         # there are trainable weights inside it.
         # Add THREE lateral 1x1 conv and THREE output 3x3 conv layers.
-        self.fpn_params = nn.ModuleDict()
+        self.fpn_params = nn.ModuleDict(
+            {
+                "conv_c3": nn.Conv2d(
+                    in_channels=dummy_out_shapes[0][1][1],
+                    out_channels=self.out_channels,
+                    kernel_size=1,
+                ),
+                "conv_c4": nn.Conv2d(
+                    in_channels=dummy_out_shapes[1][1][1],
+                    out_channels=self.out_channels,
+                    kernel_size=1,
+                ),
+                "conv_c5": nn.Conv2d(
+                    in_channels=dummy_out_shapes[2][1][1],
+                    out_channels=self.out_channels,
+                    kernel_size=1,
+                ),
+                "conv_p3": nn.Conv2d(
+                    in_channels=self.out_channels,
+                    out_channels=self.out_channels,
+                    kernel_size=3,
+                    padding=1,
+                ),
+                "conv_p4": nn.Conv2d(
+                    in_channels=self.out_channels,
+                    out_channels=self.out_channels,
+                    kernel_size=3,
+                    padding=1,
+                ),
+                "conv_p5": nn.Conv2d(
+                    in_channels=self.out_channels,
+                    out_channels=self.out_channels,
+                    kernel_size=3,
+                    padding=1,
+                ),
+            }
+        )
         ######################################################################
         #                            END OF YOUR CODE                        #
         ######################################################################
@@ -103,12 +139,28 @@ class DetectorBackboneWithFPN(nn.Module):
         # HINT: Use `F.interpolate` to upsample FPN features.                #
         ######################################################################
 
-        pass
+        # C5 -> P5
+        fpn_feats["p5"] = self.fpn_params["c5"](backbone_feats["c5"])
+        fpn_feats["p5"] = self.fpn_params["p5"](fpn_feats["p5"])
+
+        # P5 -> P4 (Upsampling)
+        fpn_feats["p4"] = self.fpn_params["c4"](backbone_feats["c4"]) + F.interpolate(
+            fpn_feats["p5"], size=backbone_feats["c4"].shape[2]
+        )
+        fpn_feats["p4"] = self.fpn_params["p4"](fpn_feats["p4"])
+
+        # P4 -> P3
+        fpn_feats["p3"] = self.fpn_params["c3"](backbone_feats["c3"]) + F.interpolate(
+            fpn_feats["p4"], size=backbone_feats["c3"].shape[2]
+        )
+        fpn_feats["p3"] = self.fpn_params["p3"](fpn_feats["p3"])
+
         ######################################################################
         #                            END OF YOUR CODE                        #
         ######################################################################
 
         return fpn_feats
+
 
 class FCOSPredictionNetwork(nn.Module):
     """
@@ -121,9 +173,7 @@ class FCOSPredictionNetwork(nn.Module):
     We will use feature maps from FPN levels (P3, P4, P5) and exclude (P6, P7).
     """
 
-    def __init__(
-        self, num_classes: int, in_channels: int, stem_channels: List[int]
-    ):
+    def __init__(self, num_classes: int, in_channels: int, stem_channels: List[int]):
         """
         Args:
             num_classes: Number of object classes for classification.
@@ -153,7 +203,21 @@ class FCOSPredictionNetwork(nn.Module):
         stem_cls = []
         stem_box = []
         # Replace "pass" statement with your code
-        pass
+
+        num_in_channels = in_channels
+        for num_out_channels in stem_channels:
+            stem = [
+                nn.Conv2d(
+                    in_channels=num_in_channels,
+                    out_channels=num_out_channels,
+                    kernel_size=3,
+                    padding=1,
+                ),
+                nn.ReLU(inplace=True),
+            ]
+            stem_cls.append(stem)
+            stem_box.append(stem)
+            num_in_channels = num_out_channels
 
         # Wrap the layers defined by student into a `nn.Sequential` module:
         self.stem_cls = nn.Sequential(*stem_cls)
@@ -175,9 +239,27 @@ class FCOSPredictionNetwork(nn.Module):
         ######################################################################
 
         # Replace these lines with your code, keep variable names unchanged.
-        self.pred_cls = None  # Class prediction conv
-        self.pred_box = None  # Box regression conv
-        self.pred_ctr = None  # Centerness conv
+        # Class prediction conv
+        self.pred_cls = nn.Conv2d(
+            in_channels=num_out_channels,
+            out_channels=num_classes,
+            kernel_size=3,
+            padding=1,
+        )
+        # Box regression conv
+        self.pred_box = nn.Conv2d(
+            in_channels=num_out_channels,
+            out_channels=4,
+            kernel_size=3,
+            padding=1,
+        )
+        # Centerness conv
+        self.pred_ctr = nn.Conv2d(
+            in_channels=num_out_channels,
+            out_channels=1,
+            kernel_size=3,
+            padding=1,
+        )
 
         ######################################################################
         #                           END OF YOUR CODE                         #
@@ -222,6 +304,7 @@ class FCOSPredictionNetwork(nn.Module):
         ######################################################################
         # Fill these with keys: {"p3", "p4", "p5"}, same as input dictionary.
         class_logits = {}
+        class_logits["p3"]
         boxreg_deltas = {}
         centerness_logits = {}
         ######################################################################
@@ -229,6 +312,7 @@ class FCOSPredictionNetwork(nn.Module):
         ######################################################################
 
         return [class_logits, boxreg_deltas, centerness_logits]
+
 
 class FCOS(nn.Module):
     """
@@ -239,9 +323,7 @@ class FCOS(nn.Module):
     training and predicts boxes during inference.
     """
 
-    def __init__(
-        self, num_classes: int, fpn_channels: int, stem_channels: List[int]
-    ):
+    def __init__(self, num_classes: int, fpn_channels: int, stem_channels: List[int]):
         super().__init__()
         self.num_classes = num_classes
 
@@ -369,7 +451,6 @@ class FCOS(nn.Module):
         # Feel free to delete this line: (but keep variable names same)
         loss_cls, loss_box, loss_ctr = None, None, None
 
-
         ######################################################################
         #                            END OF YOUR CODE                        #
         ######################################################################
@@ -466,7 +547,7 @@ class FCOS(nn.Module):
             # Step 1:
             # Replace "pass" statement with your code
             pass
-            
+
             # Step 2:
             # Replace "pass" statement with your code
             pass

@@ -207,7 +207,8 @@ def fcos_apply_deltas_to_locations(
     # output_boxes = torch.zeros_like(deltas)
     
     # Get the deltas and locations coordinates
-    l, t, r, b = deltas.unbind(dim=1)
+    deltas_clamped = deltas.clamp(min=0)
+    l, t, r, b = deltas_clamped.unbind(dim=1)
     x, y = locations.unbind(dim=1)
 
     output_boxes = torch.stack(
@@ -219,9 +220,6 @@ def fcos_apply_deltas_to_locations(
         ],
         dim = 1
     )
-
-    # Clip the boxes to the image dimensions
-    output_boxes = output_boxes.clamp(min=0)
 
 
     ##########################################################################
@@ -262,6 +260,7 @@ def fcos_make_centerness_targets(deltas: torch.Tensor):
         (torch.min(l, r) * torch.min(t, b))/
         (torch.max(l, r) * torch.max(t, b))
     )
+    centerness[deltas < 0] = -1
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
