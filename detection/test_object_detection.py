@@ -72,6 +72,7 @@ class TestDetectorBackboneWithFPN(unittest.TestCase):
         }
 
         # Get CPU tensors for this sanity check: (you can pass `device=` argument.
+        print(fpn_feats_shapes)
         locations_per_fpn_level = get_fpn_location_coords(fpn_feats_shapes, self.backbone.fpn_strides)
         expected_locations = {
             "p3": torch.tensor([[4.0, 4.0], [4.0, 12.0], [4.0, 20.0], [4.0, 28.0], [4.0, 36.0]]),

@@ -139,8 +139,30 @@ def fcos_get_deltas_from_locations(
     ##########################################################################
     # Set this to Tensor of shape (N, 4) giving deltas (left, top, right, bottom)
     # from the locations to GT box edges, normalized by FPN stride.
-    deltas = None
-    pass
+    
+    # We don't care about the class label if it exists
+    if gt_boxes.shape[1] == 5:
+        gt_boxes = gt_boxes[:, :4]
+    
+    # Get the locations and GT box coordinates
+    x0, y0, x1, y1 = gt_boxes.unbind(dim=1)
+    x, y = locations.unbind(dim=1)
+
+    # Compute the deltas
+    deltas = torch.stack(
+        [
+            torch.abs((x - x0) / stride),  # left
+            torch.abs((y - y0) / stride),  # top
+            torch.abs((x1 - x) / stride),  # right
+            torch.abs((y1 - y) / stride),  # bottom
+        ],
+        dim=1,
+    )
+
+    # If GT box is (-1, -1, -1, -1), then deltas should be (-1, -1, -1, -1)
+    deltas[gt_boxes[:, 0] < 0] = torch.Tensor([-1, -1, -1, -1])
+
+
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
@@ -181,7 +203,26 @@ def fcos_apply_deltas_to_locations(
     # for our use-case because the feature center must lie INSIDE the final  #
     # box. Make sure to clip them to zero.                                   #
     ##########################################################################
-    output_boxes = None
+    # output_boxes = None
+    # output_boxes = torch.zeros_like(deltas)
+    
+    # Get the deltas and locations coordinates
+    l, t, r, b = deltas.unbind(dim=1)
+    x, y = locations.unbind(dim=1)
+
+    output_boxes = torch.stack(
+        [
+            x - l * stride, # left edge
+            y - t * stride, # top edge
+            x + r * stride, # right edge
+            y + b * stride  # bottom edge
+        ],
+        dim = 1
+    )
+
+    # Clip the boxes to the image dimensions
+    output_boxes = output_boxes.clamp(min=0)
+
 
     ##########################################################################
     #                             END OF YOUR CODE                           #
@@ -215,7 +256,12 @@ def fcos_make_centerness_targets(deltas: torch.Tensor):
     #   (max(left, right) * max(top, bottom))
     # )
     ##########################################################################
-    centerness = None
+    l, t, r, b = deltas.unbind(dim=1)
+
+    centerness = torch.sqrt(
+        (torch.min(l, r) * torch.min(t, b))/
+        (torch.max(l, r) * torch.max(t, b))
+    )
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
@@ -253,12 +299,27 @@ def get_fpn_location_coords(
         level_name: None for level_name, _ in shape_per_fpn_level.items()
     }
 
+
+    # self.assertEqual(self.dummy_fpn_feats["p3"].shape, torch.Size([2, self.out_channels, 28, 28]))
+    # self.assertEqual(self.dummy_fpn_feats["p4"].shape, torch.Size([2, self.out_channels, 14, 14]))
+    # self.assertEqual(self.dummy_fpn_feats["p5"].shape, torch.Size([2, self.out_channels, 7, 7]))
+
+    # expected_locations = {
+    #     "p3": torch.tensor([[4.0, 4.0], [4.0, 12.0], [4.0, 20.0], [4.0, 28.0], [4.0, 36.0]]),
+    #     "p4": torch.tensor([[8.0, 8.0], [8.0, 24.0], [8.0, 40.0], [8.0, 56.0], [8.0, 72.0]]),
+    #     "p5": torch.tensor([[16.0, 16.0], [16.0, 48.0], [16.0, 80.0], [16.0, 112.0], [16.0, 144.0]]),
+    # }
+
     for level_name, feat_shape in shape_per_fpn_level.items():
         level_stride = strides_per_fpn_level[level_name]
         ##################################################################–####
         # TODO: Implement logic to get location co-ordinates below.          #
         ######################################################################
-        pass
+        
+        B, C, H, W = feat_shape
+
+        
+
         ######################################################################
         #                             END OF YOUR CODE                       #
         ######################################################################
