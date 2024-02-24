@@ -28,6 +28,9 @@ from detection_helper import train_detector, inference_with_detector
 from detection_helper import VOC2007DetectionTiny
 from one_stage_detector import FCOS
 from utils.utils import detection_visualizer
+import warnings
+
+warnings.filterwarnings("ignore")
 
 if torch.cuda.is_available():
     print("Good to go!")
@@ -42,11 +45,13 @@ IMAGE_SHAPE = (224, 224)
 NUM_WORKERS = 12
 DATASET_PATH = "../data"
 
+
 @dataclass
 class HyperParameters:
     """
     Hyperparameters for training.
     """
+
     num_classes: int = NUM_CLASSES
     batch_size: int = BATCH_SIZE
     num_workers: int = NUM_WORKERS
@@ -56,15 +61,18 @@ class HyperParameters:
     max_iters: int = 9000
     device: str = DEVICE
 
+
 def create_dataset_and_dataloaders(subset=False):
     train_dataset = VOC2007DetectionTiny(
-        DATASET_PATH, "train", image_size=IMAGE_SHAPE[0],
-        download=True# True (set to False after the first time)
+        DATASET_PATH,
+        "train",
+        image_size=IMAGE_SHAPE[0],
+        download=True,  # True (set to False after the first time)
     )
     if subset:
         small_dataset = torch.utils.data.Subset(
             train_dataset,
-            torch.linspace(0, len(train_dataset) - 1, steps=BATCH_SIZE * 10).long()
+            torch.linspace(0, len(train_dataset) - 1, steps=BATCH_SIZE * 10).long(),
         )
         train_dataset = small_dataset
 
@@ -84,6 +92,7 @@ def create_dataset_and_dataloaders(subset=False):
 
     return train_loader, val_loader, train_dataset, val_dataset
 
+
 def train_model(detector, train_loader, hyperparams, overfit=False):
     device = hyperparams.device
     detector = detector.to(device)
@@ -95,17 +104,20 @@ def train_model(detector, train_loader, hyperparams, overfit=False):
         max_iters=hyperparams.max_iters,
         log_period=hyperparams.log_period,
         device=hyperparams.device,
-        overfit=overfit
+        overfit=overfit,
     )
     print("Successfully finished training.")
     return
+
 
 def visualize_gt(train_dataset, val_dataset):
     writer = SummaryWriter("detection_logs")
     inverse_norm = transforms.Compose(
         [
-            transforms.Normalize(mean=[0., 0., 0.], std=[1 / 0.229, 1 / 0.224, 1 / 0.225]),
-            transforms.Normalize(mean=[-0.485, -0.456, -0.406], std=[1., 1., 1.]),
+            transforms.Normalize(
+                mean=[0.0, 0.0, 0.0], std=[1 / 0.229, 1 / 0.224, 1 / 0.225]
+            ),
+            transforms.Normalize(mean=[-0.485, -0.456, -0.406], std=[1.0, 1.0, 1.0]),
         ]
     )
     gt_images = []
@@ -119,19 +131,21 @@ def visualize_gt(train_dataset, val_dataset):
         is_valid = gt_boxes[:, 4] >= 0
         img = detection_visualizer(image, val_dataset.idx_to_class, gt_boxes[is_valid])
         gt_images.append(torch.from_numpy(img))
-    
+
     img_grid = make_grid(gt_images, nrow=8)
     writer.add_image("train/gt_images", img_grid, global_step=idx)
     writer.close()
 
+
 def main(args):
     print("Loading data...")
-    
+
     if args.overfit:
         print("Loading a small subset for overfitting.")
-    train_loader, val_loader, train_dataset, val_dataset = create_dataset_and_dataloaders(args.overfit)
-    
-    
+    train_loader, val_loader, train_dataset, val_dataset = (
+        create_dataset_and_dataloaders(args.overfit)
+    )
+
     if args.overfit:
         hyperparams = HyperParameters(
             max_iters=250,
@@ -152,12 +166,12 @@ def main(args):
 
     if args.visualize_gt:
         print("Visualizing GT...")
-        visualize_gt(train_dataset, val_dataset)        
+        visualize_gt(train_dataset, val_dataset)
         return
-    
+
     print("Training model...")
-    if not args.visualize_gt:
-        train_model(detector, train_loader, hyperparams, overfit=args.overfit)
+    # if not args.visualize_gt:
+    #     train_model(detector, train_loader, hyperparams, overfit=args.overfit)
     # print("Training complete! Saving loss curve to loss.png...")
     print("Training complete!")
     if not args.inference:
@@ -165,14 +179,13 @@ def main(args):
     print("Running inference...")
     if args.test_inference:
         small_dataset = torch.utils.data.Subset(
-            val_dataset,
-            torch.linspace(0, len(val_dataset) - 1, steps=10).long()
+            val_dataset, torch.linspace(0, len(val_dataset) - 1, steps=10).long()
         )
         small_val_loader = torch.utils.data.DataLoader(
             small_dataset, batch_size=1, pin_memory=True, num_workers=NUM_WORKERS
         )
         # Modify this depending on where you save your weights.
-        weights_path = os.path.join(".", "fcos_detector.pt")
+        weights_path = os.path.join(".", "fcos_detector_full.pt")
 
         # Re-initialize so this cell is independent from prior cells.
         detector = FCOS(
@@ -185,7 +198,7 @@ def main(args):
             detector,
             small_val_loader,
             val_dataset.idx_to_class,
-            score_thresh=0.7,
+            score_thresh=0.4,
             nms_thresh=0.5,
             device=DEVICE,
             dtype=torch.float32,
@@ -194,7 +207,7 @@ def main(args):
         print("Running inference and computing mAP...")
         assert os.path.exists("mAP")
         # Modify this depending on where you save your weights.
-        weights_path = os.path.join(".", "fcos_detector.pt")
+        weights_path = os.path.join(".", "fcos_detector_full.pt")
         detector.to(device=DEVICE)
         detector.load_state_dict(torch.load(weights_path, map_location="cpu"))
         inference_with_detector(
@@ -209,20 +222,14 @@ def main(args):
         )
         os.system("cd mAP && python main.py")
         print("Output file written to ./mAP/output/mAP.png")
-        
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--visualize_gt", action="store_true")
-    parser.add_argument(
-        "--overfit", type=bool, default=True
-    )
-    parser.add_argument(
-        "--inference", type=bool, default=False
-    )
-    parser.add_argument(
-        "--test_inference", type=bool, default=False
-    )
+    parser.add_argument("--overfit", type=bool, default=True)
+    parser.add_argument("--inference", type=bool, default=True)
+    parser.add_argument("--test_inference", type=bool, default=True)
     args = parser.parse_args()
     print(args.test_inference)
     main(args)
