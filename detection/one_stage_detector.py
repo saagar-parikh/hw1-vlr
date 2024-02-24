@@ -241,21 +241,21 @@ class FCOSPredictionNetwork(nn.Module):
         # Replace these lines with your code, keep variable names unchanged.
         # Class prediction conv
         self.pred_cls = nn.Conv2d(
-            in_channels=temp_channel,
+            in_channels=num_in_channels,
             out_channels=num_classes,
             kernel_size=3,
             padding=1,
         )
         # Box regression conv
         self.pred_box = nn.Conv2d(
-            in_channels=temp_channel,
+            in_channels=num_in_channels,
             out_channels=4,
             kernel_size=3,
             padding=1,
         )
         # Centerness conv
         self.pred_ctr = nn.Conv2d(
-            in_channels=temp_channel,
+            in_channels=num_in_channels,
             out_channels=1,
             kernel_size=3,
             padding=1,
@@ -514,11 +514,15 @@ class FCOS(nn.Module):
         loss_cls = sigmoid_focal_loss(pred_cls_logits, gt_one_hot)
 
         # Box
-        loss_box = 0.25 * F.l1_loss(pred_boxreg_deltas, matched_gt_deltas)
+        loss_box = 0.25 * F.l1_loss(
+            pred_boxreg_deltas, matched_gt_deltas, reduction="none"
+        )
         loss_box[matched_gt_deltas < 0] *= 0.0  # Background
 
         # Ctr
-        loss_ctr = F.binary_cross_entropy_with_logits(pred_ctr_logits, centerness)
+        loss_ctr = F.binary_cross_entropy_with_logits(
+            pred_ctr_logits, centerness, reduction="none"
+        )
         loss_ctr[centerness < 0] *= 0.0  # Background
 
         ######################################################################

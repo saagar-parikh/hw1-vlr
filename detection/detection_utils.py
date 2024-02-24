@@ -157,6 +157,9 @@ def fcos_get_deltas_from_locations(
         dim=1,
     )
 
+    # If GT box is (-1, -1, -1, -1), then deltas should be (-1, -1, -1, -1)
+    deltas[gt_boxes[:, 0] < 0] = -1
+
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
@@ -198,7 +201,7 @@ def fcos_apply_deltas_to_locations(
     # box. Make sure to clip them to zero.                                   #
     ##########################################################################
     # output_boxes = None
-    output_boxes = torch.zeros_like(deltas)
+    # output_boxes = torch.zeros_like(deltas)
 
     # Get the deltas and locations coordinates
     deltas_clamped = deltas.clamp(min=0)
