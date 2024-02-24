@@ -1,4 +1,3 @@
-
 from typing import Optional
 
 import pdb
@@ -16,6 +15,7 @@ from torchvision.utils import make_grid
 from torch.utils.tensorboard import SummaryWriter
 
 from utils.utils import detection_visualizer
+
 
 class VOC2007DetectionTiny(torch.utils.data.Dataset):
     """
@@ -54,12 +54,8 @@ class VOC2007DetectionTiny(torch.utils.data.Dataset):
         # fmt: on
 
         # Make a (class to ID) and inverse (ID to class) mapping.
-        self.class_to_idx = {
-            _class: _idx for _idx, _class in enumerate(voc_classes)
-        }
-        self.idx_to_class = {
-            _idx: _class for _idx, _class in enumerate(voc_classes)
-        }
+        self.class_to_idx = {_class: _idx for _idx, _class in enumerate(voc_classes)}
+        self.idx_to_class = {_idx: _class for _idx, _class in enumerate(voc_classes)}
 
         # Load instances from JSON file:
         self.instances = json.load(
@@ -73,9 +69,7 @@ class VOC2007DetectionTiny(torch.utils.data.Dataset):
             transforms.Resize(image_size),
             transforms.CenterCrop(image_size),
             transforms.ToTensor(),
-            transforms.Normalize(
-                mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-            ),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ]
         self.image_transform = transforms.Compose(_transforms)
 
@@ -96,7 +90,6 @@ class VOC2007DetectionTiny(torch.utils.data.Dataset):
             "https://web.eecs.umich.edu/~justincj/data/voc07_val.json",
             out=dataset_dir,
         )
-        
 
     def __len__(self):
         return len(self.instances)
@@ -158,15 +151,11 @@ class VOC2007DetectionTiny(torch.utils.data.Dataset):
 
         # Center cropping may completely exclude certain boxes that were close
         # to image boundaries. Set them to -1
-        invalid = (gt_boxes[:, 0] > gt_boxes[:, 2]) | (
-            gt_boxes[:, 1] > gt_boxes[:, 3]
-        )
+        invalid = (gt_boxes[:, 0] > gt_boxes[:, 2]) | (gt_boxes[:, 1] > gt_boxes[:, 3])
         gt_boxes[invalid] = -1
 
         # Pad to max 40 boxes, that's enough for VOC.
-        gt_boxes = torch.cat(
-            [gt_boxes, torch.zeros(40 - len(gt_boxes), 5).fill_(-1.0)]
-        )
+        gt_boxes = torch.cat([gt_boxes, torch.zeros(40 - len(gt_boxes), 5).fill_(-1.0)])
         # Return image path because it is needed for evaluation.
         return image_path, image, gt_boxes
 
@@ -231,7 +220,16 @@ def train_detector(
         optimizer.step()
         lr_scheduler.step()
         for key, value in losses.items():
-            writer.add_scalar("train/" + key + "_{}".format("overfit" if overfit else "full"), value, _iter)
+            writer.add_scalar(
+                "train/" + key + "_{}".format("overfit" if overfit else "full"),
+                value,
+                _iter,
+            )
+        writer.add_scalar(
+            "train/total_loss" + "_{}".format("overfit" if overfit else "full"),
+            total_loss,
+            _iter,
+        )
         # Print losses periodically.
         if _iter % log_period == 0:
             loss_str = f"[Iter {_iter}][loss: {total_loss:.3f}]"
@@ -239,10 +237,11 @@ def train_detector(
                 loss_str += f"[{key}: {value:.3f}]"
             print(loss_str)
             loss_history.append(total_loss.item())
-            
+
         writer.close()
     print("Finished training, saving model.")
     torch.save(detector.state_dict(), "fcos_detector.pt")
+
 
 def inference_with_detector(
     detector,
@@ -252,9 +251,9 @@ def inference_with_detector(
     nms_thresh: float,
     output_dir: Optional[str] = None,
     dtype: torch.dtype = torch.float32,
-    device:str = "cpu",
+    device: str = "cpu",
 ):
-   
+
     # ship model to GPU
     detector.to(dtype=dtype, device=device)
 
@@ -268,9 +267,7 @@ def inference_with_detector(
             transforms.Normalize(
                 mean=[0.0, 0.0, 0.0], std=[1 / 0.229, 1 / 0.224, 1 / 0.225]
             ),
-            transforms.Normalize(
-                mean=[-0.485, -0.456, -0.406], std=[1.0, 1.0, 1.0]
-            ),
+            transforms.Normalize(mean=[-0.485, -0.456, -0.406], std=[1.0, 1.0, 1.0]),
         ]
     )
 
@@ -339,13 +336,11 @@ def inference_with_detector(
                         f"{idx_to_class[b[4].item()]} {b[5]:.6f} {b[0]:.2f} {b[1]:.2f} {b[2]:.2f} {b[3]:.2f}\n"
                     )
         else:
-            image = detection_visualizer(
-                image, idx_to_class, gt_boxes, pred_boxes
-            )
+            image = detection_visualizer(image, idx_to_class, gt_boxes, pred_boxes)
             all_images.append(torch.from_numpy(image))
-    
+
     if output_dir is None:
-        writer=SummaryWriter("detection_logs")
+        writer = SummaryWriter("detection_logs")
         image_grid = make_grid(all_images, nrow=8)
         writer.add_image("test_images", image_grid)
         writer.close()

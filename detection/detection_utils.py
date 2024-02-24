@@ -157,9 +157,6 @@ def fcos_get_deltas_from_locations(
         dim=1,
     )
 
-    # If GT box is (-1, -1, -1, -1), then deltas should be (-1, -1, -1, -1)
-    deltas[gt_boxes[:, 0] < 0] = -1
-
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
@@ -201,7 +198,7 @@ def fcos_apply_deltas_to_locations(
     # box. Make sure to clip them to zero.                                   #
     ##########################################################################
     # output_boxes = None
-    # output_boxes = torch.zeros_like(deltas)
+    output_boxes = torch.zeros_like(deltas)
 
     # Get the deltas and locations coordinates
     deltas_clamped = deltas.clamp(min=0)
@@ -256,6 +253,7 @@ def fcos_make_centerness_targets(deltas: torch.Tensor):
         (torch.min(l, r) * torch.min(t, b)) / (torch.max(l, r) * torch.max(t, b))
     )
     centerness[deltas[:, 0] < 0] = -1
+
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
@@ -310,13 +308,13 @@ def get_fpn_location_coords(
         # TODO: Implement logic to get location co-ordinates below.          #
         ######################################################################
 
-        x, y = torch.meshgrid(
+        xx, yy = torch.meshgrid(
             torch.arange(feat_shape[3], dtype=dtype, device=device),
             torch.arange(feat_shape[2], dtype=dtype, device=device),
-            indexing="ij",
         )
         location_coords[level_name] = (
-            torch.stack((x, y), dim=2).reshape(-1, 2) * level_stride + level_stride // 2
+            torch.stack((xx, yy), dim=2).reshape(-1, 2) * level_stride
+            + level_stride // 2
         )
 
         ######################################################################
